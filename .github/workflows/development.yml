@@ -98,14 +98,13 @@ jobs:
         run: |
           brew update
           brew install make
-          # Verify that 'gmake' now exists
           gmake --version
 
-      # 9) Install JDK 8 (Temurin 8) so your Makefile’s “You need to install JDK 8” check passes
-      - name: Set up Java 8
+      # 9) Install Azul Zulu 8 (so your Makefile sees JDK 8)
+      - name: Install Azul Zulu 8
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: 'zulu'
           java-version: '8'
 
       # 10) Build for the given matrix.platform_name
