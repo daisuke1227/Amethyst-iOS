@@ -73,13 +73,18 @@ jobs:
           git config user.name "github-actions"
           export PATH=/opt/procursus/bin:$PATH
           wget https://github.com/leetal/ios-cmake/raw/master/ios.toolchain.cmake
-          cmake -B build -DCMAKE_TOOLCHAIN_FILE=ios.toolchain.cmake -DDEFAULT_ES=2 \
-            -DNOX11=ON -DNOEGL=OFF -DSTATICLIB=OFF -DPLATFORM=OS64 \
+          cmake -B build \
+            -DCMAKE_TOOLCHAIN_FILE=ios.toolchain.cmake \
+            -DDEFAULT_ES=2 \
+            -DNOX11=ON \
+            -DNOEGL=OFF \
+            -DSTATICLIB=OFF \
+            -DPLATFORM=OS64 \
             -DCMAKE_C_FLAGS=-Wno-error=implicit-function-declaration
           cmake --build build --config RelWithDebInfo --target GL
           cp -R lib/libGL.dylib ../Natives/resources/Frameworks/libgl4es_114.dylib
 
-      # 7) Push updated gl4es back to the repo on main branch (not PR) if cache missed
+      # 7) Push updated gl4es back to the repo on main branch if cache missed
       - name: Push gl4es
         if: ${{ github.event_name != 'pull_request' && github.ref_name == 'main' && steps.gl4es-cache.outputs.cache-hit != 'true' }}
         continue-on-error: true
@@ -88,7 +93,15 @@ jobs:
           git commit -am "CI: Update gl4es"
           git push
 
-      # 8) Build for the given matrix.platform_name
+      # 8) Install GNU Make (so that `gmake` is available)
+      - name: Install GNU Make
+        run: |
+          brew update
+          brew install make
+          # 'gmake' will now exist
+          gmake --version
+
+      # 9) Build for the given matrix.platform_name
       - name: Build for ${{ matrix.platform_name }}
         run: |
           export PATH=/opt/homebrew/bin:$PATH
@@ -106,7 +119,7 @@ jobs:
             gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }}
           fi
 
-      # 9) Upload the various artifacts
+      # 10) Upload the various artifacts
       - name: Upload regular ipa
         uses: actions/upload-artifact@v4
         with:
