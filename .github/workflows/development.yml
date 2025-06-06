@@ -22,12 +22,15 @@ jobs:
     runs-on: macos-latest
 
     steps:
+      # 1) Always checkout first
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Checkout repository submodules
-        run: git submodule update --init --recursive
+        run: |
+          git submodule update --init --recursive
 
+      # 2) Clean up only known build artifacts, not the entire working directory
       - name: Clean up old build artifacts
         run: |
           echo "Before cleanup:"
@@ -37,29 +40,32 @@ jobs:
           echo "After cleanup:"
           ls -lah .
 
+      # 3) Grab the latest gl4es commit hash
       - name: Get gl4es latest commit hash
         id: gl4es-sha
         run: |
           sha=$(git ls-remote https://github.com/PojavLauncherTeam/gl4es-114-extra refs/heads/master | awk '{print $1}')
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
+      # 4) Cache gl4es
       - name: Cache gl4es
         uses: actions/cache@v4
-        if: ${{ false }} 
         id: gl4es-cache
         with:
           path: gl4es/libs
           key: gl4es-holy-ios-shared-2-${{ steps.gl4es-sha.outputs.sha }}
 
+      # 5) Check out gl4es only if cache missed
       - name: Get gl4es
+        if: ${{ steps.gl4es-cache.outputs.cache-hit != 'true' }}
         uses: actions/checkout@v4
-        if: ${{ false && steps.gl4es-cache.outputs.cache-hit != 'true' }}
         with:
           repository: 'PojavLauncherTeam/gl4es-114-extra'
           path: 'gl4es'
 
+      # 6) Build gl4es if cache missed
       - name: Build gl4es
-        if: ${{ false && steps.gl4es-cache.outputs.cache-hit != 'true' }}
+        if: ${{ steps.gl4es-cache.outputs.cache-hit != 'true' }}
         continue-on-error: true
         run: |
           cd gl4es
@@ -73,28 +79,34 @@ jobs:
           cmake --build build --config RelWithDebInfo --target GL
           cp -R lib/libGL.dylib ../Natives/resources/Frameworks/libgl4es_114.dylib
 
+      # 7) Push updated gl4es back to the repo on main branch (not PR) if cache missed
       - name: Push gl4es
-        if: ${{ false && github.event_name != 'pull_request' && github.ref_name == 'main' && steps.gl4es-cache.outputs.cache-hit != 'true' }}
+        if: ${{ github.event_name != 'pull_request' && github.ref_name == 'main' && steps.gl4es-cache.outputs.cache-hit != 'true' }}
         continue-on-error: true
         run: |
           git add Natives/resources/Frameworks/libgl4es_114.dylib
           git commit -am "CI: Update gl4es"
           git push
 
+      # 8) Build for the given matrix.platform_name
       - name: Build for ${{ matrix.platform_name }}
         run: |
           export PATH=/opt/homebrew/bin:$PATH
           export SLIMMED=1
 
           if [ "${{ matrix.platform_name }}" == "ios" ]; then
+            # Build ipa and tipa for iOS
             gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }}
             gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
           elif [ "${{ matrix.platform_name }}" == "tvos" ]; then
+            # Build tipa only for tvOS
             gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
           else
+            # Build ipa only for everything else
             gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }}
           fi
 
+      # 9) Upload the various artifacts
       - name: Upload regular ipa
         uses: actions/upload-artifact@v4
         with:
