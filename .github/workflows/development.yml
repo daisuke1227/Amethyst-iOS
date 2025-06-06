@@ -94,7 +94,7 @@ jobs:
           path: depends
           workflow_conclusion: success
           allow_forks: false
-          repo: AngelAuraMC/android-openjdk-build-multiarch
+          repo: PojavLauncherTeam/android-openjdk-build-multiarch
           branch: buildjre8
           name: jre8-ios-aarch64
 
